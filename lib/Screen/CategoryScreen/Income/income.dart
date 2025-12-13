@@ -119,7 +119,7 @@ class _IncomePageState extends State<IncomePage> {
                   ),
                 );
                 if(result != null){
-                  print("Expense added: $result");
+                  print("Income added: $result");
                   fetchIncomeCategories(); // optional: refresh list
                 }
               },
