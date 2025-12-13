@@ -1,3 +1,4 @@
+import 'package:budgetapp/Service/apiservice.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -34,7 +35,8 @@ class _ProfilePageState extends State<ProfilePage> {
   String? memberSince;
   Future<void> _fetchUserSince() async {
     final response = await http.post(
-      Uri.parse("http://192.168.43.192/BUDGET_APP/fd_user_since.php"), // your PHP URL
+      //Uri.parse("http://192.168.43.192/BUDGET_APP/fd_user_since.php"),
+      Uri.parse(ApiService.getUrl("fd_user_since.php")),
     );
 
     if (response.statusCode == 200) {
@@ -58,7 +60,8 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<int> fetchTotalExpense(String userId) async {
     try {
       var response = await http.post(
-        Uri.parse("http://192.168.43.192/BUDGET_APP/total_exp_month.php"),
+        //Uri.parse("http://192.168.43.192/BUDGET_APP/total_exp_month.php"),
+        Uri.parse(ApiService.getUrl("total_exp_month.php")),
         body: {
           "user_id": userId,
           "month": monthNumber, // Add month parameter
@@ -80,7 +83,8 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<int> fetchTotalIncome(String userId) async {
     try {
       var response = await http.post(
-        Uri.parse("http://192.168.43.192/BUDGET_APP/total_income_month.php"),
+        //Uri.parse("http://192.168.43.192/BUDGET_APP/total_income_month.php"),
+        Uri.parse(ApiService.getUrl("total_income_month.php")),
         body: {
           "user_id": userId,
           "month": monthNumber,
@@ -129,7 +133,8 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _fetchUserData() async {
     try {
       final response = await http.post(
-        Uri.parse('http://192.168.43.192/BUDGET_APP/fd_profile.php'),
+        //Uri.parse('http://192.168.43.192/BUDGET_APP/fd_profile.php'),
+        Uri.parse(ApiService.getUrl("fd_profile.php")),
         body: {
           'userid': widget.userId,
         },
@@ -175,7 +180,8 @@ class _ProfilePageState extends State<ProfilePage> {
       // Create multipart request for image upload
       var request = http.MultipartRequest(
         'POST',
-        Uri.parse('http://192.168.43.192/BUDGET_APP/profile_edit.php'),
+        //Uri.parse('http://192.168.43.192/BUDGET_APP/profile_edit.php'),
+        Uri.parse(ApiService.getUrl("profile_edit.php")),
       );
 
       // Add all fields

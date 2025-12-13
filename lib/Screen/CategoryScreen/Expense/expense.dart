@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:budgetapp/Service/apiservice.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../CategorySetting/mainpagecat.dart';
@@ -15,6 +16,7 @@ class ExpensePage extends StatefulWidget {
 class _ExpensePageState extends State<ExpensePage> {
   List<dynamic> expenseCategories = [];
   bool isLoading = true;
+  final String url=ApiService.getUrl("fd_view_exp.php");
 
   @override
   void initState() {
@@ -25,7 +27,7 @@ class _ExpensePageState extends State<ExpensePage> {
   Future<void> fetchExpenseCategories() async {
     try {
       var response = await http.post(
-        Uri.parse("http://192.168.43.192/BUDGET_APP/fd_view_exp.php"),
+        Uri.parse(url),
         body: {"userid": widget.userId},
       );
 
@@ -110,7 +112,8 @@ class _ExpensePageState extends State<ExpensePage> {
                     categoryName: name,
                     userId: widget.userId,
                     catIcon: iconCode,
-                    apiUrl: "http://192.168.43.192/BUDGET_APP/fd_amount_ins.php",
+                    //apiUrl: "http://192.168.43.192/BUDGET_APP/fd_amount_ins.php",
+                    apiUrl: ApiService.getUrl("fd_amount_ins.php"),
                     type: "Expense",
                   ),
                 );

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:budgetapp/Service/apiservice.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
@@ -25,7 +26,9 @@ class _SetbudgetcatState extends State<Setbudgetcat> {
   }
 
   Future<void> fetchCategories() async {
-    String apiUrl = "http://192.168.43.192/BUDGET_APP/fd_view_exp.php";
+    //String apiUrl = "http://192.168.43.192/BUDGET_APP/fd_view_exp.php";
+    String apiUrl = ApiService.getUrl("fd_view_exp.php");
+
 
     try {
       var response = await http.post(Uri.parse(apiUrl), body: {
@@ -51,7 +54,8 @@ class _SetbudgetcatState extends State<Setbudgetcat> {
     }
   }
   Future<void> deleteBudget(String catName) async {
-    String apiUrl = "http://192.168.43.192/BUDGET_APP/fd_budget_delete.php";
+    //String apiUrl = "http://192.168.43.192/BUDGET_APP/fd_budget_delete.php";
+    String apiUrl = ApiService.getUrl("fd_budget_delete.php");
 
     try {
       var response = await http.post(Uri.parse(apiUrl), body: {

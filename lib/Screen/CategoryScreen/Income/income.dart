@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:budgetapp/Service/apiservice.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../CategorySetting/mainpagecat.dart';
@@ -25,7 +26,8 @@ class _IncomePageState extends State<IncomePage> {
   Future<void> fetchIncomeCategories() async {
     try {
       var response = await http.post(
-        Uri.parse("http://192.168.43.192/BUDGET_APP/fd_view_income.php"),
+        //Uri.parse("http://192.168.43.192/BUDGET_APP/fd_view_income.php"),
+        Uri.parse(ApiService.getUrl("fd_view_income.php")),
         body: {"userid": widget.userId},
       );
 
@@ -111,7 +113,8 @@ class _IncomePageState extends State<IncomePage> {
                     categoryName: name,
                     userId: widget.userId,
                     catIcon: iconCode,
-                    apiUrl:"http://192.168.43.192/BUDGET_APP/fd_income_amount.php",
+                    //apiUrl:"http://192.168.43.192/BUDGET_APP/fd_income_amount.php",
+                    apiUrl:ApiService.getUrl("fd_income_amount.php"),
                     type: "Income",
                   ),
                 );

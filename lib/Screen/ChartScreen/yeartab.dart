@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:budgetapp/Service/apiservice.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:fl_chart/fl_chart.dart';
@@ -49,7 +50,8 @@ class _YearTabState extends State<YearTab> with SingleTickerProviderStateMixin {
 
     try {
       var response = await http.post(
-        Uri.parse("http://192.168.43.192/BUDGET_APP/yearly_chart_data.php"),
+        //Uri.parse("http://192.168.43.192/BUDGET_APP/yearly_chart_data.php"),
+        Uri.parse(ApiService.getUrl("yearly_chart_data.php")),
         body: {
           "user_id": widget.userId,
           "year": year,

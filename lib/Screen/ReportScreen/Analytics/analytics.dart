@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:budgetapp/Service/apiservice.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
@@ -31,7 +32,8 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
   Future<int> fetchTotalExpense(String userId) async {
     try {
       var response = await http.post(
-        Uri.parse("http://192.168.43.192/BUDGET_APP/total_exp_month.php"),
+        //Uri.parse("http://192.168.43.192/BUDGET_APP/total_exp_month.php"),
+        Uri.parse(ApiService.getUrl("total_exp_month.php")),
         body: {
           "user_id": userId,
           "month": monthNumber, // Add month parameter
@@ -53,7 +55,8 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
   Future<int> fetchTotalIncome(String userId) async {
     try {
       var response = await http.post(
-        Uri.parse("http://192.168.43.192/BUDGET_APP/total_income_month.php"),
+        //Uri.parse("http://192.168.43.192/BUDGET_APP/total_income_month.php"),
+        Uri.parse(ApiService.getUrl("total_income_month.php")),
         body: {
           "user_id": userId,
           "month": monthNumber, // Add month parameter

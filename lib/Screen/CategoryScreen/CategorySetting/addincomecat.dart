@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:budgetapp/Service/apiservice.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
@@ -23,7 +24,8 @@ class _AddIncomeState extends State<AddIncome> {
     fetchCategories();
   }
   Future<void> fetchCategories() async {
-    String apiUrl = "http://192.168.43.192/BUDGET_APP/fd_view_income.php";
+    //String apiUrl = "http://192.168.43.192/BUDGET_APP/fd_view_income.php";
+    String apiUrl=ApiService.getUrl("fd_view_income.php");
 
     try {
       var response = await http.post(Uri.parse(apiUrl), body: {
@@ -49,7 +51,8 @@ class _AddIncomeState extends State<AddIncome> {
     }
   }
   Future<void> deleteCategory(String id) async {
-    String apiUrl = "http://192.168.43.192/BUDGET_APP/fd_delete_income.php";
+    //String apiUrl = "http://192.168.43.192/BUDGET_APP/fd_delete_income.php";
+    String apiUrl=ApiService.getUrl("fd_delete_income.php");
 
     try {
       var response = await http.post(

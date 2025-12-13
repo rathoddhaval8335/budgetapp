@@ -1,3 +1,4 @@
+import 'package:budgetapp/Service/apiservice.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
@@ -200,9 +201,13 @@ class TransactionDetailPage extends StatelessWidget {
                                   return;
                                 }
 
+                                // String apiUrl = type == "Expense"
+                                //     ? "http://192.168.43.192/BUDGET_APP/fd_update_expense.php"
+                                //     : "http://192.168.43.192/BUDGET_APP/fd_upincome_tranction.php";
                                 String apiUrl = type == "Expense"
-                                    ? "http://192.168.43.192/BUDGET_APP/fd_update_expense.php"
-                                    : "http://192.168.43.192/BUDGET_APP/fd_upincome_tranction.php";
+                                    ? ApiService.getUrl("fd_update_expense.php")
+                                    : ApiService.getUrl("fd_upincome_tranction.php");
+
 
                                 var response = await http.post(
                                   Uri.parse(apiUrl),
@@ -280,9 +285,13 @@ class TransactionDetailPage extends StatelessWidget {
 
                       if (!confirm) return;
 
+                      // String deleteApi = type == "Expense"
+                      //     ? "http://192.168.43.192/BUDGET_APP/fd_delete_expense.php"
+                      //     : "http://192.168.43.192/BUDGET_APP/fd_delete_intraction.php";
+
                       String deleteApi = type == "Expense"
-                          ? "http://192.168.43.192/BUDGET_APP/fd_delete_expense.php"
-                          : "http://192.168.43.192/BUDGET_APP/fd_delete_intraction.php";
+                          ? ApiService.getUrl("fd_delete_expense.php")
+                          : ApiService.getUrl("ffd_delete_intraction.php");
 
                       var response = await http.post(
                         Uri.parse(deleteApi),

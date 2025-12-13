@@ -1,3 +1,4 @@
+import 'package:budgetapp/Service/apiservice.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -36,7 +37,8 @@ class _BudgetUpdateDialogState extends State<BudgetUpdateDialog> {
 
     setState(() => isLoading = true);
 
-    final url = Uri.parse('http://192.168.43.192/BUDGET_APP/fd_budget_update.php');
+    //final url = Uri.parse('http://192.168.43.192/BUDGET_APP/fd_budget_update.php');
+    final url = Uri.parse(ApiService.getUrl("fd_budget_update.php"));
     try {
       final response = await http.post(url, body: {
         "id": widget.id.toString(),

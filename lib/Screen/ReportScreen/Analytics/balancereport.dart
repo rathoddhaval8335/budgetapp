@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:budgetapp/Service/apiservice.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
@@ -27,7 +28,8 @@ class _BalanceReportState extends State<BalanceReport> {
 
     try {
       var response = await http.post(
-        Uri.parse("http://192.168.43.192/BUDGET_APP/monthly_report.php"),
+       // Uri.parse("http://192.168.43.192/BUDGET_APP/monthly_report.php"),
+        Uri.parse(ApiService.getUrl("monthly_report.php")),
         body: {
           "user_id": widget.userId,
           "year": year.toString(), // send selected year (0 for All)
@@ -80,7 +82,8 @@ class _BalanceReportState extends State<BalanceReport> {
   Future<int> fetchTotalExpense(String userId, int year) async {
     try {
       var response = await http.post(
-        Uri.parse("http://192.168.43.192/BUDGET_APP/total_expense.php"),
+       // Uri.parse("http://192.168.43.192/BUDGET_APP/total_expense.php"),
+        Uri.parse(ApiService.getUrl("total_expense.php")),
         body: {
           "user_id": userId,
           "year": year.toString(),
@@ -101,7 +104,8 @@ class _BalanceReportState extends State<BalanceReport> {
   Future<int> fetchTotalIncome(String userId, int year) async {
     try {
       var response = await http.post(
-        Uri.parse("http://192.168.43.192/BUDGET_APP/total_income.php"),
+        //Uri.parse("http://192.168.43.192/BUDGET_APP/total_income.php"),
+        Uri.parse(ApiService.getUrl("total_income.php")),
         body: {
           "user_id": userId,
           "year": year.toString(),

@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../../Service/apiservice.dart';
 import '../budgetset.dart';
 
 class BudgetCard extends StatefulWidget {
@@ -39,7 +40,8 @@ class _BudgetCardState extends State<BudgetCard> {
   Future<void> fetchMonthlyBudget() async {
     try {
       final response = await http.post(
-        Uri.parse("http://192.168.43.192/BUDGET_APP/fd_get_monthly.php"),
+       // Uri.parse("http://192.168.43.192/BUDGET_APP/fd_get_monthly.php"),
+        Uri.parse(ApiService.getUrl("fd_get_monthly.php")),
         body: {"userid": widget.userId},
       );
 
@@ -58,7 +60,8 @@ class _BudgetCardState extends State<BudgetCard> {
   Future<void> fetchTotalExpense() async {
     try {
       var response = await http.post(
-        Uri.parse("http://192.168.43.192/BUDGET_APP/total_exp_month.php"),
+        //Uri.parse("http://192.168.43.192/BUDGET_APP/total_exp_month.php"),
+        Uri.parse(ApiService.getUrl("total_exp_month.php")),
         body: {
           "user_id": widget.userId,
           "month": monthNumber,

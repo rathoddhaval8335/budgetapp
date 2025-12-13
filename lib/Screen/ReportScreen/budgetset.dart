@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:budgetapp/Service/apiservice.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
@@ -82,8 +83,13 @@ class _BudgetScreenState extends State<BudgetScreen> {
   Future<void> fetchBudgetData() async {
     if (selectedMonth == null) return;
 
+    // final url = Uri.parse(
+    //     'http://192.168.43.192/BUDGET_APP/fd_remainig_val.php?userid=${widget.userId}&month=$selectedMonth');
+
     final url = Uri.parse(
-        'http://192.168.43.192/BUDGET_APP/fd_remainig_val.php?userid=${widget.userId}&month=$selectedMonth');
+        ApiService.getUrl("fd_remainig_val.php?userid=${widget.userId}&month=$selectedMonth"));
+
+
 
     print('Fetching data for month: $selectedMonth');
 
@@ -129,8 +135,11 @@ class _BudgetScreenState extends State<BudgetScreen> {
       selectedMonth = month;
     });
 
+    // final url = Uri.parse(
+    //     'http://192.168.43.192/BUDGET_APP/fd_remainig_val.php?userid=${widget.userId}&month=$month');
     final url = Uri.parse(
-        'http://192.168.43.192/BUDGET_APP/fd_remainig_val.php?userid=${widget.userId}&month=$month');
+        ApiService.getUrl("fd_remainig_val.php?userid=${widget.userId}&month=$month"));
+
 
     print('Fetching data for month: $month');
 

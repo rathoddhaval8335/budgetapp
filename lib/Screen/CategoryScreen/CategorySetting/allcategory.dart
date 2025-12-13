@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:budgetapp/Service/apiservice.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
@@ -29,7 +30,8 @@ class _AllAddCatPageState extends State<AllAddCatPage> {
   }
 
   Future<void> fetchCategories() async {
-    const apiUrl = "http://192.168.43.192/BUDGET_APP/fd_view_category.php";
+    //String apiUrl = "http://192.168.43.192/BUDGET_APP/fd_view_category.php";
+    String apiUrl=ApiService.getUrl("fd_view_category.php");
     try {
       final response = await http.post(Uri.parse(apiUrl));
       final data = jsonDecode(response.body);
@@ -67,9 +69,12 @@ class _AllAddCatPageState extends State<AllAddCatPage> {
     }
 
     // Choose API URL based on selected tab
+    // String apiUrl = selectedTabIndex == 0
+    //     ? "http://192.168.43.192/BUDGET_APP/fd_insert_exp.php"
+    //     : "http://192.168.43.192/BUDGET_APP/fd_insert_income.php";
     String apiUrl = selectedTabIndex == 0
-        ? "http://192.168.43.192/BUDGET_APP/fd_insert_exp.php"
-        : "http://192.168.43.192/BUDGET_APP/fd_insert_income.php";
+        ? ApiService.getUrl("fd_insert_exp.php")
+        : ApiService.getUrl("fd_insert_income.php");
 
     try {
       var response = await http.post(

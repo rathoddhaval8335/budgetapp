@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
+import 'package:budgetapp/Service/apiservice.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
@@ -58,8 +59,10 @@ class _TransactionListPageState extends State<TransactionListPage> {
   }
 
   Future<void> fetchTransactions() async {
-    final String expenseApi = "http://192.168.43.192/BUDGET_APP/fd_exp_tranction.php";
-    final String incomeApi = "http://192.168.43.192/BUDGET_APP/fd_income_tranction.php";
+   // final String expenseApi = "http://192.168.43.192/BUDGET_APP/fd_exp_tranction.php";
+    final String expenseApi = ApiService.getUrl("fd_exp_tranction.php");
+    //final String incomeApi = "http://192.168.43.192/BUDGET_APP/fd_income_tranction.php";
+    final String incomeApi = ApiService.getUrl("fd_income_tranction.php");
 
     try {
       // POST request for both APIs with month and year
