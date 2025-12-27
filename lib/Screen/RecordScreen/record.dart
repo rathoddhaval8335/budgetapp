@@ -18,10 +18,11 @@ class RecordPage extends StatefulWidget {
 class _RecordPageState extends State<RecordPage> {
   String year = DateFormat('yyyy').format(DateTime.now());
   String month = DateFormat('MMM').format(DateTime.now()).toUpperCase();
-  String monthNumber = DateFormat('MM').format(DateTime.now()); // Add this for month number
+  String monthNumber = DateFormat('MM').format(DateTime.now());
   int totalExpense = 0;
   int totalIncome = 0;
   int balance = 0;
+  bool _isRefreshing = false;
 
   Future<void> _pickMonthYear() async {
     final DateTime? picked = await showMonthPicker(
@@ -35,21 +36,20 @@ class _RecordPageState extends State<RecordPage> {
       setState(() {
         year = DateFormat('yyyy').format(picked);
         month = DateFormat('MMM').format(picked).toUpperCase();
-        monthNumber = DateFormat('MM').format(picked); // Update month number
+        monthNumber = DateFormat('MM').format(picked);
       });
-      _fetchTotals(); // Refresh totals when month changes
+      await _fetchTotals();
     }
   }
 
   Future<int> fetchTotalExpense(String userId) async {
     try {
       var response = await http.post(
-        //Uri.parse("http://192.168.43.192/BUDGET_APP/total_exp_month.php"),
         Uri.parse(ApiService.getUrl("total_exp_month.php")),
         body: {
           "user_id": userId,
-          "month": monthNumber, // Add month parameter
-          "year": year, // Add year parameter
+          "month": monthNumber,
+          "year": year,
         },
       );
 
@@ -67,12 +67,11 @@ class _RecordPageState extends State<RecordPage> {
   Future<int> fetchTotalIncome(String userId) async {
     try {
       var response = await http.post(
-        //Uri.parse("http://192.168.43.192/BUDGET_APP/total_income_month.php"),
         Uri.parse(ApiService.getUrl("total_income_month.php")),
         body: {
           "user_id": userId,
-          "month": monthNumber, // Add month parameter
-          "year": year, // Add year parameter
+          "month": monthNumber,
+          "year": year,
         },
       );
 
@@ -88,14 +87,31 @@ class _RecordPageState extends State<RecordPage> {
   }
 
   Future<void> _fetchTotals() async {
-    int expense = await fetchTotalExpense(widget.userId);
-    int income = await fetchTotalIncome(widget.userId);
-
     setState(() {
-      totalExpense = expense;
-      totalIncome = income;
-      balance = income - expense;
+      _isRefreshing = true;
     });
+
+    try {
+      int expense = await fetchTotalExpense(widget.userId);
+      int income = await fetchTotalIncome(widget.userId);
+
+      setState(() {
+        totalExpense = expense;
+        totalIncome = income;
+        balance = income - expense;
+        _isRefreshing = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isRefreshing = false;
+      });
+      print("Error fetching totals: $e");
+    }
+  }
+
+  // Refresh button function
+  void _handleRefresh() async {
+    await _fetchTotals();
   }
 
   @override
@@ -117,8 +133,19 @@ class _RecordPageState extends State<RecordPage> {
               fontSize: 15, color: Colors.black, fontWeight: FontWeight.w900),
         ),
         actions: [
-          IconButton(onPressed: () {}, icon: const Icon(Icons.search)),
-          IconButton(onPressed: () {}, icon: const Icon(Icons.calendar_month)),
+          IconButton(
+            onPressed: _isRefreshing ? null : _handleRefresh,
+            icon: _isRefreshing
+                ? const SizedBox(
+              height: 20,
+              width: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Colors.black,
+              ),
+            )
+                : const Icon(Icons.refresh, color: Colors.black),
+          ),
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(70),
@@ -162,32 +189,62 @@ class _RecordPageState extends State<RecordPage> {
                     const Text("Expenses",
                         style: TextStyle(fontSize: 15, color: Colors.black)),
                     const SizedBox(height: 5),
-                    Text(totalExpense.toString(),
-                        style: const TextStyle(fontSize: 15, color: Colors.black)),
+                    _isRefreshing
+                        ? const SizedBox(
+                      height: 15,
+                      width: 15,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.black,
+                      ),
+                    )
+                        : Text(totalExpense.toString(),
+                        style: const TextStyle(
+                            fontSize: 15, color: Colors.black)),
                   ],
                 ),
 
                 // Income
                 Column(
                   mainAxisSize: MainAxisSize.min,
-                  children:  [
+                  children: [
                     const Text("Income",
                         style: TextStyle(fontSize: 15, color: Colors.black)),
                     const SizedBox(height: 5),
-                    Text(totalIncome.toString(),
-                        style: const TextStyle(fontSize: 15, color: Colors.black)),
+                    _isRefreshing
+                        ? const SizedBox(
+                      height: 15,
+                      width: 15,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.black,
+                      ),
+                    )
+                        : Text(totalIncome.toString(),
+                        style: const TextStyle(
+                            fontSize: 15, color: Colors.black)),
                   ],
                 ),
 
                 // Balance
                 Column(
                   mainAxisSize: MainAxisSize.min,
-                  children:  [
+                  children: [
                     const Text("Balance",
                         style: TextStyle(fontSize: 15, color: Colors.black)),
                     const SizedBox(height: 5),
-                    Text(balance.toString(),
-                        style: const TextStyle(fontSize: 15, color: Colors.black)),
+                    _isRefreshing
+                        ? const SizedBox(
+                      height: 15,
+                      width: 15,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.black,
+                      ),
+                    )
+                        : Text(balance.toString(),
+                        style: const TextStyle(
+                            fontSize: 15, color: Colors.black)),
                   ],
                 ),
               ],
@@ -199,6 +256,7 @@ class _RecordPageState extends State<RecordPage> {
         userId: widget.userId,
         selectedMonth: month,
         selectedYear: year,
+        onDataRefresh: _fetchTotals, // Pass callback to TransactionListPage
       ),
     );
   }

@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
+import '../Service/apiservice.dart';
+import '../shared_pref/sharedpref_screen.dart';
 import 'login.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -14,25 +16,41 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController =
-  TextEditingController();
-  final TextEditingController _phoneController = TextEditingController();
+  late final TextEditingController _nameController;
+  late final TextEditingController _emailController;
+  late final TextEditingController _passwordController;
+  late final TextEditingController _confirmPasswordController;
+  late final TextEditingController _phoneController;
+  final SharedPrefManager _prefManager = SharedPrefManager();
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _isLoading = false;
 
-  Future<void> registerUser() async {
-    if (_isLoading) return;
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController();
+    _emailController = TextEditingController();
+    _passwordController = TextEditingController();
+    _confirmPasswordController = TextEditingController();
+    _phoneController = TextEditingController();
+
+    // Initialize SharedPreferences
+    _prefManager.init();
+  }
+
+  Future<void> _registerUser() async {
+    if (_isLoading || !(_formKey.currentState?.validate() ?? false)) return;
+
+    // Unfocus keyboard before API call
+    FocusScope.of(context).unfocus();
 
     setState(() {
       _isLoading = true;
     });
 
-    final url = Uri.parse("https://prakrutitech.xyz/dhaval/fd_register.php");
+    final url = Uri.parse(ApiService.getUrl("fd_register.php"));
 
     try {
       final response = await http.post(
@@ -46,81 +64,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
         },
       ).timeout(const Duration(seconds: 30));
 
-      print("Response status: ${response.statusCode}");
-      print("Response body: ${response.body}");
-      final cleanedResponse = response.body.trim();
-      if (response.statusCode == 200) {
-        try {
-          final data = jsonDecode(cleanedResponse);
-          if (data["success"] == true) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(data["message"] ?? "Registration successful"),
-                  backgroundColor: Colors.green,
-                  duration: const Duration(seconds: 1),
-                ),
-              );
+      if (!mounted) return;
 
-              await Future.delayed(const Duration(milliseconds: 1200));
-
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const LoginScreen()),
-              );
-            }
-          }else {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(data["message"] ?? "Registration failed"),
-                  backgroundColor: Colors.red,
-                ),
-              );
-            }
-          }
-
-
-        } catch (e) {
-          print("JSON decode error: $e");
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text("Invalid server response format!"),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-        }
-
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text("Server error! Status code: ${response.statusCode}"),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
+      await _handleResponse(response);
     } on http.ClientException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Network error: ${e.message}"),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      _showErrorSnackBar("Network error: ${e.message}");
     } on Exception catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Error: $e"),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      _showErrorSnackBar("Error: ${e.toString()}");
     } finally {
       if (mounted) {
         setState(() {
@@ -130,29 +80,129 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
+  Future<void> _handleResponse(http.Response response) async {
+    if (response.statusCode == 200) {
+      final cleanedResponse = response.body.trim();
+      try {
+        final data = jsonDecode(cleanedResponse);
+        if (data["success"] == true) {
+          // If registration is successful, save user data
+          final userId = data["user_id"]?.toString() ?? data["id"]?.toString();
+          if (userId != null) {
+            await _prefManager.setUserId(userId);
+            await _prefManager.setEmail(_emailController.text.trim());
+            await _prefManager.setUserName(_nameController.text.trim());
+          }
+
+          _showSuccessSnackBar(
+              data["message"] ?? "Registration successful");
+          _navigateToLogin();
+        } else {
+          _showErrorSnackBar(data["message"] ?? "Registration failed");
+        }
+      } catch (e) {
+        _showErrorSnackBar("Invalid server response format!");
+      }
+    } else {
+      _showErrorSnackBar("Server error! Status: ${response.statusCode}");
+    }
+  }
+
+  void _showSuccessSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+      ),
+    );
+  }
+
+  void _showErrorSnackBar(String message) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 3),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+      ),
+    );
+  }
+
+  void _navigateToLogin() {
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+        );
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isSmallScreen = screenWidth < 600;
+    final isLandscape = screenHeight < 500;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FBFF),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            if (isLandscape) {
+              return _buildLandscapeLayout();
+            }
+            return _buildPortraitLayout(isSmallScreen, constraints.maxWidth);
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPortraitLayout(bool isSmallScreen, double maxWidth) {
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      padding: EdgeInsets.symmetric(
+        horizontal: isSmallScreen ? 16 : 24,
+        vertical: 16,
+      ),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          minHeight: MediaQuery.of(context).size.height,
+        ),
+        child: IntrinsicHeight(
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
               // Header Section
-              _buildHeader(),
-              const SizedBox(height: 32),
+              _buildHeader(isSmallScreen),
+              SizedBox(height: isSmallScreen ? 24 : 32),
 
               // Registration Form
-              _buildRegistrationForm(),
+              Expanded(
+                child: _buildRegistrationForm(isSmallScreen),
+              ),
 
               // Register Button
-              const SizedBox(height: 32),
-              _buildRegisterButton(),
+              SizedBox(height: isSmallScreen ? 24 : 32),
+              _buildRegisterButton(isSmallScreen),
 
               // Login Link
-              const SizedBox(height: 24),
+              SizedBox(height: isSmallScreen ? 16 : 24),
               _buildLoginLink(),
+              SizedBox(height: MediaQuery.of(context).padding.bottom + 16),
             ],
           ),
         ),
@@ -160,19 +210,51 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildLandscapeLayout() {
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: 1,
+              child: _buildHeader(true),
+            ),
+            const SizedBox(width: 32),
+            Expanded(
+              flex: 2,
+              child: Column(
+                children: [
+                  _buildRegistrationForm(true),
+                  const SizedBox(height: 24),
+                  _buildRegisterButton(true),
+                  const SizedBox(height: 16),
+                  _buildLoginLink(),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(bool isSmallScreen) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 80,
-          height: 80,
+          width: isSmallScreen ? 60 : 80,
+          height: isSmallScreen ? 60 : 80,
           decoration: BoxDecoration(
             gradient: const LinearGradient(
               colors: [Color(0xFF2196F3), Color(0xFF1976D2)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(isSmallScreen ? 16 : 20),
             boxShadow: [
               BoxShadow(
                 color: Colors.blue.withOpacity(0.3),
@@ -181,37 +263,42 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
             ],
           ),
-          child: const Icon(
+          child: Icon(
             Icons.account_balance_wallet,
             color: Colors.white,
-            size: 40,
+            size: isSmallScreen ? 30 : 40,
           ),
         ),
-        const SizedBox(height: 20),
-        const Text(
+        SizedBox(height: isSmallScreen ? 12 : 20),
+        Text(
           'Create Account',
           style: TextStyle(
-            fontSize: 28,
+            fontSize: isSmallScreen ? 22 : 28,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF1976D2),
+            color: const Color(0xFF1976D2),
+            height: 1.2,
           ),
         ),
-        const SizedBox(height: 8),
-        const Text(
+        SizedBox(height: isSmallScreen ? 4 : 8),
+        Text(
           'Sign up to start managing your budget',
-          style: TextStyle(fontSize: 16, color: Colors.grey),
+          style: TextStyle(
+            fontSize: isSmallScreen ? 14 : 16,
+            color: Colors.grey,
+            height: 1.4,
+          ),
           textAlign: TextAlign.center,
         ),
       ],
     );
   }
 
-  Widget _buildRegistrationForm() {
+  Widget _buildRegistrationForm(bool isSmallScreen) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(isSmallScreen ? 16 : 24),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 16 : 20),
         boxShadow: [
           BoxShadow(
             color: Colors.blue.withOpacity(0.1),
@@ -236,8 +323,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 }
                 return null;
               },
+              isSmallScreen: isSmallScreen,
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: isSmallScreen ? 12 : 20),
 
             // Email Field
             _buildTextField(
@@ -250,15 +338,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 if (value == null || value.isEmpty) {
                   return 'Please enter your email';
                 }
-                if (!RegExp(
-                  r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
-                ).hasMatch(value)) {
+                if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
                   return 'Please enter a valid email';
                 }
                 return null;
               },
+              isSmallScreen: isSmallScreen,
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: isSmallScreen ? 12 : 20),
 
             // Password Field
             _buildPasswordField(
@@ -280,8 +367,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 }
                 return null;
               },
+              isSmallScreen: isSmallScreen,
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: isSmallScreen ? 12 : 20),
 
             // Confirm Password Field
             _buildPasswordField(
@@ -303,8 +391,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 }
                 return null;
               },
+              isSmallScreen: isSmallScreen,
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: isSmallScreen ? 12 : 20),
 
             // Phone Number Field
             _buildTextField(
@@ -317,13 +406,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 if (value == null || value.isEmpty) {
                   return 'Please enter your phone number';
                 }
-                if (!RegExp(
-                  r'^[+]*[(]{0,1}[0-9]{1,4}[)]{0,1}[-\s\./0-9]*$',
-                ).hasMatch(value)) {
+                if (!RegExp(r'^[+]*[(]{0,1}[0-9]{1,4}[)]{0,1}[-\s\./0-9]*$')
+                    .hasMatch(value)) {
                   return 'Please enter a valid phone number';
                 }
                 return null;
               },
+              isSmallScreen: isSmallScreen,
             ),
           ],
         ),
@@ -336,6 +425,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     required String label,
     required String hintText,
     required IconData prefixIcon,
+    required bool isSmallScreen,
     TextInputType? keyboardType,
     String? Function(String?)? validator,
   }) {
@@ -344,31 +434,42 @@ class _RegisterScreenState extends State<RegisterScreen> {
       children: [
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 14,
+          style: TextStyle(
+            fontSize: isSmallScreen ? 13 : 14,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF1976D2),
+            color: const Color(0xFF1976D2),
+            height: 1.2,
           ),
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: isSmallScreen ? 6 : 8),
         Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12),
             border: Border.all(color: Colors.blue.withOpacity(0.3)),
           ),
           child: TextFormField(
             controller: controller,
             keyboardType: keyboardType,
             validator: validator,
-            style: const TextStyle(color: Colors.black87),
+            style: TextStyle(
+              color: Colors.black87,
+              fontSize: isSmallScreen ? 14 : 16,
+            ),
             decoration: InputDecoration(
               hintText: hintText,
-              hintStyle: TextStyle(color: Colors.grey.shade400),
-              prefixIcon: Icon(prefixIcon, color: const Color(0xFF2196F3)),
+              hintStyle: TextStyle(
+                color: Colors.grey.shade400,
+                fontSize: isSmallScreen ? 14 : 16,
+              ),
+              prefixIcon: Icon(
+                prefixIcon,
+                color: const Color(0xFF2196F3),
+                size: isSmallScreen ? 20 : 24,
+              ),
               border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 16,
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: isSmallScreen ? 12 : 16,
+                vertical: isSmallScreen ? 14 : 16,
               ),
             ),
           ),
@@ -384,35 +485,44 @@ class _RegisterScreenState extends State<RegisterScreen> {
     required bool isPassword,
     required VoidCallback onToggle,
     required String? Function(String?)? validator,
+    required bool isSmallScreen,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 14,
+          style: TextStyle(
+            fontSize: isSmallScreen ? 13 : 14,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF1976D2),
+            color: const Color(0xFF1976D2),
+            height: 1.2,
           ),
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: isSmallScreen ? 6 : 8),
         Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12),
             border: Border.all(color: Colors.blue.withOpacity(0.3)),
           ),
           child: TextFormField(
             controller: controller,
             obscureText: isPassword,
             validator: validator,
-            style: const TextStyle(color: Colors.black87),
+            style: TextStyle(
+              color: Colors.black87,
+              fontSize: isSmallScreen ? 14 : 16,
+            ),
             decoration: InputDecoration(
               hintText: hintText,
-              hintStyle: TextStyle(color: Colors.grey.shade400),
-              prefixIcon: const Icon(
+              hintStyle: TextStyle(
+                color: Colors.grey.shade400,
+                fontSize: isSmallScreen ? 14 : 16,
+              ),
+              prefixIcon: Icon(
                 Icons.lock_outline,
-                color: Color(0xFF2196F3),
+                color: const Color(0xFF2196F3),
+                size: isSmallScreen ? 20 : 24,
               ),
               suffixIcon: IconButton(
                 icon: Icon(
@@ -420,13 +530,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ? Icons.visibility_outlined
                       : Icons.visibility_off_outlined,
                   color: const Color(0xFF2196F3),
+                  size: isSmallScreen ? 20 : 24,
                 ),
                 onPressed: onToggle,
+                splashRadius: isSmallScreen ? 18 : 24,
               ),
               border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 16,
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: isSmallScreen ? 12 : 16,
+                vertical: isSmallScreen ? 14 : 16,
               ),
             ),
           ),
@@ -435,40 +547,39 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  Widget _buildRegisterButton() {
+  Widget _buildRegisterButton(bool isSmallScreen) {
     return SizedBox(
       width: double.infinity,
-      height: 56,
+      height: isSmallScreen ? 48 : 56,
       child: ElevatedButton(
-        onPressed: _isLoading
-            ? null
-            : () async {
-          if (_formKey.currentState!.validate()) {
-            await registerUser();
-          }
-        },
+        onPressed: _isLoading ? null : _registerUser,
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFF2196F3),
           foregroundColor: Colors.white,
           elevation: 5,
           shadowColor: Colors.blue.withOpacity(0.3),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
+            borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 15),
           ),
-          padding: const EdgeInsets.symmetric(vertical: 16),
+          padding: EdgeInsets.symmetric(
+            vertical: isSmallScreen ? 12 : 16,
+          ),
         ),
         child: _isLoading
-            ? const SizedBox(
-          height: 20,
-          width: 20,
+            ? SizedBox(
+          height: isSmallScreen ? 18 : 20,
+          width: isSmallScreen ? 18 : 20,
           child: CircularProgressIndicator(
             strokeWidth: 2,
             valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
           ),
         )
-            : const Text(
+            : Text(
           'Create Account',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+          style: TextStyle(
+            fontSize: isSmallScreen ? 16 : 18,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
     );
@@ -478,9 +589,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Text(
+        Text(
           'Already have an account? ',
-          style: TextStyle(color: Colors.grey),
+          style: TextStyle(
+            color: Colors.grey,
+            fontSize: MediaQuery.of(context).size.width < 600 ? 14 : 16,
+          ),
         ),
         GestureDetector(
           onTap: _isLoading
@@ -488,7 +602,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
               : () {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => const LoginScreen()),
+              MaterialPageRoute(
+                builder: (context) => const LoginScreen(),
+              ),
             );
           },
           child: Text(
@@ -496,6 +612,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             style: TextStyle(
               color: _isLoading ? Colors.grey : const Color(0xFF2196F3),
               fontWeight: FontWeight.w600,
+              fontSize: MediaQuery.of(context).size.width < 600 ? 14 : 16,
             ),
           ),
         ),

@@ -1,195 +1,270 @@
-import 'dart:convert';
-
-import 'package:budgetapp/Service/apiservice.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-
+import 'package:get/get.dart';
+import '../../../Controllers/Expensecatgorycontroller.dart';
 import 'allcategory.dart';
 
 class Addexpensecategory extends StatefulWidget {
   final String userId;
-  const Addexpensecategory({super.key, required this.userId});
+  final GlobalKey<RefreshIndicatorState>? refreshKey;
+
+  const Addexpensecategory({super.key, required this.userId, this.refreshKey});
 
   @override
   State<Addexpensecategory> createState() => _AddexpensecategoryState();
 }
 
 class _AddexpensecategoryState extends State<Addexpensecategory> {
+  late ExpenseCategoryController controller;
+  final GlobalKey<RefreshIndicatorState> _localRefreshKey =
+  GlobalKey<RefreshIndicatorState>();
 
-  List<dynamic> categories = [];
-  bool isLoading = true;
   @override
   void initState() {
     super.initState();
-    fetchCategories();
-  }
-  Future<void> fetchCategories() async {
-    //String apiUrl = "http://192.168.43.192/BUDGET_APP/fd_view_exp.php";
-    String apiUrl =ApiService.getUrl("fd_view_exp.php");
-
+    // Get existing controller or create new one
     try {
-      var response = await http.post(Uri.parse(apiUrl), body: {
-        "userid": widget.userId,
-      });
-
-      var jsonData = jsonDecode(response.body);
-
-      if (jsonData['status'] == "success") {
-        setState(() {
-          categories = jsonData['data'];
-          isLoading = false;
-        });
-      } else {
-        setState(() {
-          categories = [];
-          isLoading = false;
-        });
-      }
+      controller = Get.find<ExpenseCategoryController>();
     } catch (e) {
-      print("Error: $e");
-      setState(() => isLoading = false);
+      controller = Get.put(ExpenseCategoryController(widget.userId));
     }
-  }
-  Future<void> deleteCategory(String id) async {
-    //String apiUrl = "http://192.168.43.192/BUDGET_APP/fd_delete_exp.php";
-    String apiUrl=ApiService.getUrl("fd_delete_exp.php");
 
-    try {
-      var response = await http.post(
-        Uri.parse(apiUrl),
-        body: {
-          "id": id.toString(),
-          "userid": widget.userId.toString(),
-        },
-      );
-
-
-      var jsonData = jsonDecode(response.body);
-      print("Delete Response: $jsonData"); // for debugging
-
-      if (jsonData['status'] == "success") {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Category deleted successfully")),
-        );
-        fetchCategories(); // refresh after delete
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(jsonData['message'] ?? "Delete failed")),
-        );
-      }
-    } catch (e) {
-      print("Delete error: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Error connecting to server")),
-      );
-    }
+    // Initial data load
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await controller.refreshData();
+    });
   }
 
+  Future<void> _handleRefresh() async {
+    await controller.refreshData();
+  }
+
+  void _triggerRefresh() {
+    (widget.refreshKey ?? _localRefreshKey).currentState?.show();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Column(
-        children: [
-          Expanded(
-            child: isLoading
-                ?  Center(child: CircularProgressIndicator())
-                : ListView.builder(
-              itemCount: categories.length,
-              itemBuilder: (context, index) {
-                var cat = categories[index];
-                return Padding(
-                  padding:  EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 4),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: ListTile(
-                      leading:IconButton(
-                    icon: const Icon(Icons.remove_circle, color: Colors.red),
-                        onPressed: () => confirmDelete(cat['id'].toString()),
-                  ),
-                      title: Row(
-                        children: [
-                          CircleAvatar(
-                            backgroundColor: Colors.grey.shade300,
-                            child: Icon(
-                              IconData(
-                                int.tryParse(cat['cat_icon'].toString()) ?? 0,
-                                fontFamily: 'MaterialIcons',
+    return GestureDetector(
+      onTap: _triggerRefresh,
+      child: GetBuilder<ExpenseCategoryController>(
+        builder: (controller) {
+          return Stack(
+            children: [
+              RefreshIndicator(
+                key: widget.refreshKey ?? _localRefreshKey,
+                onRefresh: _handleRefresh,
+                color: Colors.blue,
+                backgroundColor: Colors.white,
+                strokeWidth: 2.5,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Column(
+                    children: [
+                      SizedBox(
+                        height: MediaQuery.of(context).size.height * 0.75,
+                        child: controller.isLoading.value
+                            ? const Center(
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                          ),
+                        )
+                            : controller.categories.isEmpty
+                            ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.category_outlined,
+                                size: 64,
+                                color: Colors.grey,
                               ),
+                              SizedBox(height: 16),
+                              Text(
+                                "No Expense Categories Found",
+                                style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.grey,
+                                    fontWeight: FontWeight.w500),
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                "Add categories by tapping the button below",
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              SizedBox(height: 20),
+                              ElevatedButton.icon(
+                                onPressed: _triggerRefresh,
+                                icon: Icon(Icons.refresh),
+                                label: Text("Refresh"),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.blue,
+                                  foregroundColor: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                            : ListView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          itemCount: controller.categories.length,
+                          itemBuilder: (context, index) {
+                            var cat = controller.categories[index];
+                            String iconCode = cat['cat_icon']?.toString() ?? '0';
+                            String categoryName = cat['cat_name']?.toString() ?? 'Unknown';
+                            String id = cat['id']?.toString() ?? '';
 
-                              color: Colors.black,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            cat['cat_name'],
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w500,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ],
+                            IconData iconData = IconData(
+                              int.tryParse(iconCode) ?? 0,
+                              fontFamily: 'MaterialIcons',
+                            );
+
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(10),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.grey.withOpacity(0.1),
+                                      blurRadius: 2,
+                                      offset: Offset(0, 1),
+                                    ),
+                                  ],
+                                ),
+                                child: ListTile(
+                                  leading: IconButton(
+                                    icon: Icon(Icons.remove_circle, color: Colors.red),
+                                    onPressed: () => _showDeleteDialog(context, id),
+                                  ),
+                                  title: Row(
+                                    children: [
+                                      CircleAvatar(
+                                        backgroundColor: Colors.blue.shade50,
+                                        child: Icon(
+                                          iconData,
+                                          color: Colors.blue,
+                                          size: 20,
+                                        ),
+                                      ),
+                                      SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          categoryName,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w500,
+                                            fontSize: 16,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  trailing: Icon(Icons.menu, color: Colors.grey),
+                                  onTap: () {
+                                    // You can add onTap functionality here if needed
+                                    print('Tapped: $categoryName');
+                                  },
+                                ),
+                              ),
+                            );
+                          },
+                        ),
                       ),
+                      Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: ElevatedButton.icon(
+                            onPressed: () async {
+                              var result = await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => AllAddCatPage(
+                                    userId: widget.userId,
+                                    initialIndex: 0,
+                                  ),
+                                ),
+                              );
 
-
-                      trailing:
-                       Icon(Icons.menu, color: Colors.grey),
-                    ),
+                              if (result == true) {
+                                // Refresh if category was added
+                                await controller.refreshData();
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue[700],
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              elevation: 2,
+                            ),
+                            icon: Icon(Icons.add, size: 20),
+                            label: Text(
+                              "Add Category",
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                );
-              },
-            ),
-          ),
-
-
-          Padding(
-            padding:  EdgeInsets.all(16.0),
-            child: SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                 Navigator.push(context, MaterialPageRoute(builder: (context)=>AllAddCatPage(userId: widget.userId,initialIndex: 0,)));
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue[700],
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                icon: Icon(Icons.add),
-                label:Text(
-                    "Add Category",
-                    style: TextStyle(fontSize: 16)
                 ),
               ),
-            ),
-          ),
-        ],
+
+              // Delete Loading Overlay using controller's isDeleting
+              Obx(() => controller.isDeleting.value
+                  ? Container(
+                color: Colors.black.withOpacity(0.3),
+                child: const Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                  ),
+                ),
+              )
+                  : const SizedBox.shrink()),
+            ],
+          );
+        },
       ),
     );
   }
 
-  void confirmDelete(String id) {
+  // Simple dialog without Get.dialog
+  void _showDeleteDialog(BuildContext context, String id) async {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text("Delete Category"),
-        content: const Text("Are you sure you want to delete this category?"),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel")),
-          TextButton(onPressed: () async {
-            Navigator.pop(ctx);
-            await deleteCategory(id);
-          }, child: const Text("Delete", style: TextStyle(color: Colors.red))),
-        ],
-      ),
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Delete Category"),
+          content: const Text("Are you sure you want to delete this Expense category?"),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text("Cancel"),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.of(context).pop(); // Close dialog
+                await controller.deleteCategory(id);
+              },
+              child: const Text(
+                "Delete",
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
-
 }
