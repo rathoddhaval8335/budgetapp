@@ -14,25 +14,49 @@ jobs:
       - uses: actions/setup-java@v3
         with:
           distribution: 'zulu'
-          java-version: '21'
+          java-version: '11'
 
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
 
+      - name: COMPLETE FIX - Icons
+        run: |
+          # 1. Purane icons COMPLETE DELETE
+          rm -rf android/app/src/main/res/mipmap-*
+          
+          # 2. Naye directories banao
+          mkdir -p android/app/src/main/res/mipmap-mdpi
+          mkdir -p android/app/src/main/res/mipmap-hdpi
+          mkdir -p android/app/src/main/res/mipmap-xhdpi
+          mkdir -p android/app/src/main/res/mipmap-xxhdpi
+          mkdir -p android/app/src/main/res/mipmap-xxxhdpi
+          
+          # 3. SACH MEIN WORKING ICONS BANAO (Base64 format mein)
+          # Yeh ek simple blue square icon hai
+          echo "iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAADLSURBVFhH7ZbBCcMwDEVzCz1BCr1CbtBTT9AL9AQ9QQo9QaEnSKEn6AkSSKEnyAkSaKEn+LNfkCQnctzGjhL3wYdlWbJkW4qdO00TYw5d5o+Ag4ODg4PzC+fu41zCXJ3sQ9i5uq5fY4xd4zg+hBB4mqaX7/t713VX27b37H3j8/k8y7LsJstS7JxlWQ/DMFxCCO9xHJ8Y4++MsRvP8+umaW6zLMXOFUVRd1336HneM2PsNQzDU9/3T1VV3WVZip1TVfVGVdUH0zSf6T2mad7run6XZSl27g9gGIZhGIZhGIZhGOZfuQZQZRV/5LZWZwAAAABJRU5ErkJggg==" | base64 -d > /tmp/icon.png
+          
+          # 4. Different sizes ke liye convert karo
+          sips -z 48 48 /tmp/icon.png --out android/app/src/main/res/mipmap-mdpi/ic_launcher.png
+          sips -z 72 72 /tmp/icon.png --out android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+          sips -z 96 96 /tmp/icon.png --out android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+          sips -z 144 144 /tmp/icon.png --out android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+          sips -z 192 192 /tmp/icon.png --out android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+          
+          # 5. Same for round icons
+          cp android/app/src/main/res/mipmap-mdpi/ic_launcher.png android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png
+          cp android/app/src/main/res/mipmap-hdpi/ic_launcher.png android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png
+          cp android/app/src/main/res/mipmap-xhdpi/ic_launcher.png android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png
+          cp android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png
+          cp android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png
+          
+          echo "✅ Icons successfully created!"
+
       - run: flutter clean
       - run: flutter pub get
 
-      - name: Simple APK Build
-        run: |
-          # Purane corrupt icons hatao
-          rm -f android/app/src/main/res/mipmap-*/ic_launcher.png 2>/dev/null || true
-          
-          # Simple blue icon banado
-          echo "iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAACXBIWXMAAAsTAAALEwEAmpwYAAAA" | base64 -d > android/app/src/main/res/mipmap-mdpi/ic_launcher.png 2>/dev/null || true
-          
-          # Build karo
-          flutter build apk --release --no-tree-shake-icons
+      - name: Build APK
+        run: flutter build apk --release --no-tree-shake-icons
 
       - name: Release
         uses: ncipollo/release-action@v1
