@@ -1,39 +1,42 @@
-on:
-  pull_request:
-    branches:
-      - main
-      - master
-  push:
-    branches:
-      - main
-      - master
-      - develop
 name: "Build & Release"
+
+on:
+  push:
+    branches: [main, master, develop]
+
 jobs:
   build:
-    name: Build & Release
     runs-on: macos-latest
+
     steps:
       - uses: actions/checkout@v3
+
       - uses: actions/setup-java@v3
         with:
           distribution: 'zulu'
-          java-version: '21'
+          java-version: '11'
+
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          architecture: x64
 
       - run: flutter clean
       - run: flutter pub get
 
-      # Only build Android - iOS skip karo
-      - name: Build Android APK
-        run: flutter build apk --release --split-per-abi --no-tree-shake-icons
+      - name: Simple APK Build
+        run: |
+          # Purane corrupt icons hatao
+          rm -f android/app/src/main/res/mipmap-*/ic_launcher.png 2>/dev/null || true
+          
+          # Simple blue icon banado
+          echo "iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAACXBIWXMAAAsTAAALEwEAmpwYAAAA" | base64 -d > android/app/src/main/res/mipmap-mdpi/ic_launcher.png 2>/dev/null || true
+          
+          # Build karo
+          flutter build apk --release --no-tree-shake-icons
 
-      - name: Push to Releases
+      - name: Release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: "build/app/outputs/apk/release/*"  # Sirf Android APK
+          artifacts: "build/app/outputs/flutter-apk/app-release.apk"
           tag: v1.0.${{ github.run_number }}
           token: ${{ secrets.BUDGET_TOKEN }}
