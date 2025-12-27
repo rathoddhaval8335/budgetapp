@@ -19,6 +19,7 @@ class _YearTabState extends State<YearTab> with SingleTickerProviderStateMixin {
   Map<String, List<Map<String, dynamic>>> yearlyData = {};
   Map<String, bool> loadingStates = {};
   Map<String, double> yearlyTotals = {};
+  bool _isInitialLoad = true;
 
   @override
   void initState() {
@@ -30,17 +31,23 @@ class _YearTabState extends State<YearTab> with SingleTickerProviderStateMixin {
     years = [for (int i = startYear; i <= currentYear; i++) "$i"];
 
     _tabController = TabController(length: years.length, vsync: this);
-    _tabController.animateTo(years.length - 1);
+
+    // Listen to tab changes BEFORE fetching data
+    _tabController.addListener(() {
+      if (_tabController.indexIsChanging) {
+        setState(() {});
+      }
+    });
+
+    // Set initial tab position
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _tabController.animateTo(years.length - 1);
+    });
 
     // Fetch data for all years
     for (String year in years) {
       _fetchYearData(year);
     }
-
-    // Listen to tab changes
-    _tabController.addListener(() {
-      setState(() {});
-    });
   }
 
   Future<void> _fetchYearData(String year) async {
@@ -50,7 +57,6 @@ class _YearTabState extends State<YearTab> with SingleTickerProviderStateMixin {
 
     try {
       var response = await http.post(
-        //Uri.parse("http://192.168.43.192/BUDGET_APP/yearly_chart_data.php"),
         Uri.parse(ApiService.getUrl("yearly_chart_data.php")),
         body: {
           "user_id": widget.userId,
@@ -59,43 +65,66 @@ class _YearTabState extends State<YearTab> with SingleTickerProviderStateMixin {
         },
       );
 
-      print("Response for $year: ${response.statusCode}");
-      print("Response body: ${response.body}");
+      print("=== Yearly Data Request ===");
+      print("Year: $year");
+      print("User ID: ${widget.userId}");
+      print("Type: ${widget.selectedType.toLowerCase()}");
+      print("Status Code: ${response.statusCode}");
+      print("Response: ${response.body}");
 
-      var jsonResponse = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        var jsonResponse = jsonDecode(response.body);
 
-      if (jsonResponse['status'] == 'success') {
-        List<dynamic> data = jsonResponse['data'];
-        double total = jsonResponse['total_amount'] ?? 0.0;
+        if (jsonResponse['status'] == 'success') {
+          List<dynamic> data = jsonResponse['data'] ?? [];
+          double total = double.tryParse(jsonResponse['total_amount']?.toString() ?? '0') ?? 0.0;
 
-        List<Map<String, dynamic>> formattedData = data.map((item) {
-          double amount = double.parse(item['amount'].toString());
-          return {
-            "category": item['category'],
-            "amount": amount,
-            "color": _getCategoryColor(item['category']),
-          };
-        }).toList();
+          print("Total Amount for $year: $total");
+          print("Data Count: ${data.length}");
 
-        setState(() {
-          yearlyData[year] = formattedData;
-          yearlyTotals[year] = total;
-          loadingStates[year] = false;
-        });
+          List<Map<String, dynamic>> formattedData = data.map((item) {
+            double amount = double.tryParse(item['amount']?.toString() ?? '0') ?? 0.0;
+            return {
+              "category": item['category']?.toString() ?? 'Unknown',
+              "amount": amount,
+              "color": _getCategoryColor(item['category']?.toString() ?? 'Unknown'),
+            };
+          }).toList();
+
+          setState(() {
+            yearlyData[year] = formattedData;
+            yearlyTotals[year] = total;
+            loadingStates[year] = false;
+            _isInitialLoad = false;
+          });
+
+          print("Successfully loaded data for $year: ${formattedData.length} categories");
+        } else {
+          print("API returned error status: ${jsonResponse['message'] ?? 'Unknown error'}");
+          setState(() {
+            yearlyData[year] = [];
+            yearlyTotals[year] = 0.0;
+            loadingStates[year] = false;
+            _isInitialLoad = false;
+          });
+        }
       } else {
-        print("Error response: $jsonResponse");
+        print("HTTP Error: ${response.statusCode}");
         setState(() {
           yearlyData[year] = [];
           yearlyTotals[year] = 0.0;
           loadingStates[year] = false;
+          _isInitialLoad = false;
         });
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       print("Error fetching data for $year: $e");
+      print("Stack Trace: $stackTrace");
       setState(() {
         yearlyData[year] = [];
         yearlyTotals[year] = 0.0;
         loadingStates[year] = false;
+        _isInitialLoad = false;
       });
     }
   }
@@ -115,9 +144,13 @@ class _YearTabState extends State<YearTab> with SingleTickerProviderStateMixin {
       Colors.lightGreen,
       Colors.pink,
       Colors.indigo,
+      Colors.brown,
+      Colors.cyan,
+      Colors.deepPurple,
+      Colors.lime,
     ];
 
-    int index = category.hashCode % colors.length;
+    int index = category.hashCode.abs() % colors.length;
     return colors[index];
   }
 
@@ -125,37 +158,38 @@ class _YearTabState extends State<YearTab> with SingleTickerProviderStateMixin {
     final data = yearlyData[year] ?? [];
     final total = yearlyTotals[year] ?? 1.0;
 
-    if (data.isEmpty) {
+    print("Building chart for $year: ${data.length} items, total: $total");
+
+    if (data.isEmpty || total == 0) {
       return [
         PieChartSectionData(
           color: Colors.grey[300],
           value: 1,
           title: 'No Data',
-          radius: 60,
+          radius: 80,
           titleStyle: const TextStyle(
-            fontSize: 12,
+            fontSize: 14,
             fontWeight: FontWeight.bold,
             color: Colors.black54,
           ),
+          showTitle: true,
         )
       ];
     }
 
-    return data.asMap().entries.map((entry) {
-      final index = entry.key;
-      final item = entry.value;
-      final percentage = ((item['amount'] / total) * 100).toStringAsFixed(1);
-
+    return data.map((item) {
+      final percentage = total > 0 ? ((item['amount'] / total) * 100) : 0;
       return PieChartSectionData(
         color: item['color'],
         value: item['amount'],
-        title: '$percentage%',
-        radius: 60,
+        title: '${percentage.toStringAsFixed(1)}%',
+        radius: 80,
         titleStyle: const TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.bold,
           color: Colors.white,
         ),
+        showTitle: percentage > 3, // Only show title if percentage > 3%
       );
     }).toList();
   }
@@ -164,74 +198,118 @@ class _YearTabState extends State<YearTab> with SingleTickerProviderStateMixin {
     final data = yearlyData[year] ?? [];
     final total = yearlyTotals[year] ?? 0.0;
 
+    print("Building legend for $year: ${data.length} items");
+
     if (data.isEmpty) {
-      return const Center(
-        child: Text(
-          "No data available",
-          style: TextStyle(
-            fontSize: 16,
-            color: Colors.grey,
-            fontWeight: FontWeight.w500,
-          ),
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.pie_chart,
+              size: 64,
+              color: Colors.grey[300],
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              "No data available for this year",
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              "Add ${widget.selectedType.toLowerCase()} entries to see the chart",
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[400],
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
       );
     }
 
-    return Column(
-      children: data.map((item) {
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: data.length,
+      itemBuilder: (context, index) {
+        final item = data[index];
         final percentage = total > 0 ? ((item['amount'] / total) * 100) : 0;
+
         return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6.0),
-          child: Row(
-            children: [
-              Container(
-                width: 16,
-                height: 16,
-                decoration: BoxDecoration(
-                  color: item['color'],
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  item['category'],
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
+          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          child: Card(
+            elevation: 1,
+            child: Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Row(
+                children: [
+                  Container(
+                    width: 20,
+                    height: 20,
+                    decoration: BoxDecoration(
+                      color: item['color'],
+                      borderRadius: BorderRadius.circular(4),
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item['category'],
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${percentage.toStringAsFixed(1)}% of total',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    "₹${item['amount'].toStringAsFixed(0)}",
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ],
               ),
-              Text(
-                "₹${item['amount'].toStringAsFixed(0)}",
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                "(${percentage.toStringAsFixed(1)}%)",
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
+            ),
           ),
         );
-      }).toList(),
+      },
     );
   }
 
   @override
   void didUpdateWidget(YearTab oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.selectedType != widget.selectedType) {
-      // Refresh all data when type changes
-      yearlyData.clear();
-      yearlyTotals.clear();
+    if (oldWidget.selectedType != widget.selectedType ||
+        oldWidget.userId != widget.userId) {
+      // Clear all data and refresh
+      setState(() {
+        yearlyData.clear();
+        yearlyTotals.clear();
+        loadingStates.clear();
+        _isInitialLoad = true;
+      });
+
       for (String year in years) {
         _fetchYearData(year);
       }
@@ -248,90 +326,191 @@ class _YearTabState extends State<YearTab> with SingleTickerProviderStateMixin {
   Widget build(BuildContext context) {
     final currentYear = years[_tabController.index];
 
-    return Column(
-      children: [
-        // Year Tabs
-        TabBar(
-          isScrollable: true,
-          controller: _tabController,
-          indicatorColor: Colors.blue,
-          labelColor: Colors.blue,
-          unselectedLabelColor: Colors.grey,
-          indicatorWeight: 3,
-          tabs: years.map((y) => Tab(text: y)).toList(),
-        ),
-
-        // Total Amount
-        Container(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              Text(
-                "Total ${widget.selectedType}",
-                style: const TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey,
-                  fontWeight: FontWeight.w500,
+    return Scaffold(
+      body: Column(
+        children: [
+          // Year Tabs Header
+          Container(
+            color: Colors.white,
+            child: Column(
+              children: [
+                TabBar(
+                  isScrollable: true,
+                  controller: _tabController,
+                  indicatorColor: Colors.blue,
+                  labelColor: Colors.blue,
+                  unselectedLabelColor: Colors.grey,
+                  labelStyle: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                  unselectedLabelStyle: const TextStyle(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 14,
+                  ),
+                  indicatorWeight: 3,
+                  tabs: years.map((y) => Tab(text: y)).toList(),
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                "₹${yearlyTotals[currentYear]?.toStringAsFixed(0) ?? '0'}",
-                style: const TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
 
-        // TabBarView
-        Expanded(
-          child: TabBarView(
-            controller: _tabController,
-            children: years.map((year) {
-              final isLoading = loadingStates[year] ?? true;
+          // Total Amount Card
+          Card(
+            margin: const EdgeInsets.all(16),
+            elevation: 3,
+            child: Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                children: [
+                  Text(
+                    "Total ${widget.selectedType} for $currentYear",
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "₹${yearlyTotals[currentYear]?.toStringAsFixed(2) ?? '0.00'}",
+                    style: const TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
 
-              if (isLoading) {
-                return const Center(
-                  child: CircularProgressIndicator(),
-                );
-              }
+          // Main Content Area
+          Expanded(
+            child: _isInitialLoad
+                ? const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text(
+                    "Loading yearly data...",
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            )
+                : TabBarView(
+              controller: _tabController,
+              children: years.map((year) {
+                final isLoading = loadingStates[year] ?? true;
+                final data = yearlyData[year] ?? [];
+                final hasData = data.isNotEmpty;
 
-              return Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  children: [
-                    // Pie Chart
-                    Expanded(
-                      flex: 2,
-                      child: PieChart(
-                        PieChartData(
-                          sections: _buildPieChartSections(year),
-                          centerSpaceRadius: 40,
-                          sectionsSpace: 4,
+                if (isLoading) {
+                  return const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(),
+                        SizedBox(height: 16),
+                        Text(
+                          "Loading data for year...",
+                          style: TextStyle(
+                            color: Colors.grey,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    children: [
+                      // Pie Chart Container
+                      Expanded(
+                        flex: hasData ? 2 : 1,
+                        child: Card(
+                          elevation: 3,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(20.0),
+                            child: Column(
+                              children: [
+                                Text(
+                                  "${widget.selectedType} Distribution",
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+                                Expanded(
+                                  child: PieChart(
+                                    PieChartData(
+                                      sections: _buildPieChartSections(year),
+                                      centerSpaceRadius: 50,
+                                      sectionsSpace: 2,
+                                      startDegreeOffset: -90,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
-                    ),
 
-                    const SizedBox(height: 20),
+                      const SizedBox(height: 20),
 
-                    // Legend
-                    Expanded(
-                      flex: 3,
-                      child: SingleChildScrollView(
-                        child: _buildLegend(year),
+                      // Legend Container
+                      Expanded(
+                        flex: hasData ? 3 : 2,
+                        child: Card(
+                          elevation: 3,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(20.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  "Category Breakdown",
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                Expanded(
+                                  child: _buildLegend(year),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              );
-            }).toList(),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
